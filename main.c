@@ -20,22 +20,25 @@ void check_command(const char *command, char commandList[6][256]) {
 
 // Main function to run the CLI
 int main() {
-    char commandList[6][256] = {
-        "help",
-        "list",
-        "add",
-        "remove",
-        "update",
-        "exit"
-    };
-    char command[256];
-    printf("ServerVault CLI\n");
-    printf("Enter a commmand to execute:\n");
-    fgets(command, sizeof(command), stdin);
-    command[strcspn(command, "\n")] = 0;
-    if (strcmp(command, "exit") == 0) {
-        printf("Exiting ServerVault CLI.\n");
-        return 0;
+    while (1)  {
+        char commandList[6][256] = {
+            "help",
+            "list",
+            "add",
+            "remove",
+            "update",
+            "exit"
+        };
+        char command[256];
+        printf("ServerVault CLI\n");
+        printf("Enter a commmand to execute:\n");
+        fgets(command, sizeof(command), stdin);
+        command[strcspn(command, "\n")] = 0;
+        if (strcmp(command, "exit") == 0) {
+            printf("Exiting ServerVault CLI.\n");
+            break;
+        }
+        check_command(command, commandList);
     }
-    check_command(command, commandList);
+    return 0;
 }
