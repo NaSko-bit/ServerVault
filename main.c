@@ -33,6 +33,9 @@ int main() {
     printf("Enter a commmand to execute:\n");
     fgets(command, sizeof(command), stdin);
     command[strcspn(command, "\n")] = 0;
+    if (strcmp(command, "exit") == 0) {
+        printf("Exiting ServerVault CLI.\n");
+        return 0;
+    }
     check_command(command, commandList);
-    return 0;
 }
