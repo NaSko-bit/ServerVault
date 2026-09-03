@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <dirent.h>
 
 void read_file(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -97,9 +98,7 @@ void copy_file(const char *source, const char *destination) {
     printf("File copied successfully.\n");
 }
 
-void list_files(void) {
-    system("ls -l");
-}
+
 
 void change_directory(const char *path) {
     if (chdir(path) != 0) {
