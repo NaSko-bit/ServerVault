@@ -2,6 +2,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 void read_file(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -91,4 +95,17 @@ void copy_file(const char *source, const char *destination) {
     fclose(dest);
 
     printf("File copied successfully.\n");
+}
+
+void list_files(void) {
+    system("ls -l");
+}
+
+void change_directory(const char *path) {
+    if (chdir(path) != 0) {
+        fprintf(stderr, "Could not change directory to '%s': %s\n", path, strerror(errno));
+        return;
+    }
+
+    printf("Changed directory to %s\n", path);
 }

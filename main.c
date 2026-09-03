@@ -13,6 +13,7 @@ typedef enum {
     CMD_READFILE,
     MOVE_FILE,
     COPY_FILE,
+    CHANGE_DIR,
     CMD_EXIT
 } Command;
 
@@ -29,6 +30,7 @@ Command parse_command(const char *command) {
         [CMD_READFILE] = "read_file",
         [MOVE_FILE] = "move_file",
         [COPY_FILE] = "copy_file",
+        [CHANGE_DIR] = "change_directory",
         [CMD_EXIT] = "exit"
     };
 
@@ -51,10 +53,14 @@ void execute_command(Command command, int argc, char *argv[]) {
             printf("update_file <filename>\n");
             printf("read_file <filename>\n");
             printf("move_file <old_filename> <new_filename>\n");
+            printf("copy_file <source> <destination>\n");
+            printf("change_directory <path>\n");
+            printf("list\n");
             break;
 
         case CMD_LIST:
             printf("Listing all items...\n");
+            list_files();
             break;
 
         case CMD_ADDFILE: {
@@ -107,6 +113,14 @@ void execute_command(Command command, int argc, char *argv[]) {
                 break;
             }
             copy_file(argv[2], argv[3]);
+            break;
+
+        case CHANGE_DIR:
+            if (argument == NULL) {
+                printf("Usage: change_directory <path>\n");
+                break;
+            }
+            change_directory(argument);
             break;
 
         default:
