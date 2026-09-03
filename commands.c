@@ -1,5 +1,7 @@
 #include "commands.h"
 #include <stdio.h>
+#include <errno.h>
+#include <string.h>
 
 void read_file(const char *filename) {
     FILE *file = fopen(filename, "r");
@@ -53,4 +55,40 @@ void update_file(const char *filename) {
     printf("File %s updated successfully.\n", filename);
 
     fclose(file);
+}
+
+void move_file(const char *source, const char *destination) {
+    if (rename(source, destination) != 0) {
+        fprintf(stderr, "Could not move file '%s' to '%s': %s\n",
+                source, destination, strerror(errno));
+        return;
+    }
+
+    printf("File moved successfully.\n");
+}
+
+void copy_file(const char *source, const char *destination) {
+    FILE *src = fopen(source, "rb");
+    if (src == NULL) {
+        fprintf(stderr, "Could not open source file '%s': %s\n", source, strerror(errno));
+        return;
+    }
+
+    FILE *dest = fopen(destination, "wb");
+    if (dest == NULL) {
+        fprintf(stderr, "Could not open destination file '%s': %s\n", destination, strerror(errno));
+        fclose(src);
+        return;
+    }
+
+    char buffer[8192];
+    size_t bytes;
+    while ((bytes = fread(buffer, 1, sizeof(buffer), src)) > 0) {
+        fwrite(buffer, 1, bytes, dest);
+    }
+
+    fclose(src);
+    fclose(dest);
+
+    printf("File copied successfully.\n");
 }

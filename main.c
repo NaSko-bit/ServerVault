@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 #include "commands.h"
 
 typedef enum {
@@ -10,11 +11,13 @@ typedef enum {
     CMD_REMOVEFILE,
     CMD_UPDATEFILE,
     CMD_READFILE,
+    MOVE_FILE,
+    COPY_FILE,
     CMD_EXIT
 } Command;
 
 Command parse_command(const char *command);
-void execute_command(Command command, const char *argument);
+void execute_command(Command command, int argc, char *argv[]);
 
 Command parse_command(const char *command) {
     const char *names[] = {
@@ -24,6 +27,8 @@ Command parse_command(const char *command) {
         [CMD_REMOVEFILE] = "remove_file",
         [CMD_UPDATEFILE] = "update_file",
         [CMD_READFILE] = "read_file",
+        [MOVE_FILE] = "move_file",
+        [COPY_FILE] = "copy_file",
         [CMD_EXIT] = "exit"
     };
 
@@ -35,7 +40,9 @@ Command parse_command(const char *command) {
     return CMD_INVALID;
 }
 
-void execute_command(Command command, const char *argument) {
+void execute_command(Command command, int argc, char *argv[]) {
+    const char *argument = argc >= 3 ? argv[2] : NULL;
+
     switch (command) {
         case CMD_HELP:
             printf("Available commands:\n");
@@ -43,6 +50,7 @@ void execute_command(Command command, const char *argument) {
             printf("remove_file <filename>\n");
             printf("update_file <filename>\n");
             printf("read_file <filename>\n");
+            printf("move_file <old_filename> <new_filename>\n");
             break;
 
         case CMD_LIST:
@@ -85,6 +93,22 @@ void execute_command(Command command, const char *argument) {
             read_file(argument);
             break;
 
+        case MOVE_FILE:
+            if (argc < 4) {
+                printf("Usage: move_file <old_filename> <new_filename>\n");
+                break;
+            }
+            move_file(argv[2], argv[3]);
+            break;
+        
+        case COPY_FILE:
+            if (argc < 4) {
+                printf("Usage: copy_file <source> <destination>\n");
+                break;
+            }
+            copy_file(argv[2], argv[3]);
+            break;
+
         default:
             printf("Invalid command.\n");
             break;
@@ -104,8 +128,7 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    const char *argument = argc >= 3 ? argv[2] : NULL;
-    execute_command(command, argument);
+    execute_command(command, argc, argv);
 
     return 0;
 }
