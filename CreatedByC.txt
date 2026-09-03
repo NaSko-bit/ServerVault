@@ -1,0 +1,1 @@
+The maximum enter at once is 8 million bits or roughly 8MB of data, this should be more than enough, probrably..
