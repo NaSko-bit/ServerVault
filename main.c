@@ -55,13 +55,16 @@ void execute_command(Command command, int argc, char *argv[]) {
             printf("move_file <old_filename> <new_filename>\n");
             printf("copy_file <source> <destination>\n");
             printf("change_directory <path>\n");
-            printf("list\n");
+            printf("list [directory]\n");
             break;
 
-        case CMD_LIST:
-            printf("Listing all items...\n");
-            list_files();
+        case CMD_LIST: {
+            const char *directory = argc >= 3 ? argv[2] : ".";
+
+            printf("Files in '%s':\n", directory);
+            list_files(directory);
             break;
+        }
 
         case CMD_ADDFILE: {
             if (argument == NULL) {

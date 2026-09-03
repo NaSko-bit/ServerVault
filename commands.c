@@ -109,3 +109,24 @@ void change_directory(const char *path) {
 
     printf("Changed directory to %s\n", path);
 }
+
+void list_files(const char *path) {
+    DIR *directory = opendir(path);
+
+    if (directory == NULL) {
+        fprintf(stderr, "Could not open directory '%s': %s\n",
+                path, strerror(errno));
+        return;
+    }
+
+    struct dirent *entry;
+
+    while ((entry = readdir(directory)) != NULL) {
+        if (strcmp(entry->d_name, ".") != 0 &&
+            strcmp(entry->d_name, "..") != 0) {
+            printf("%s\n", entry->d_name);
+        }
+    }
+
+    closedir(directory);
+}
