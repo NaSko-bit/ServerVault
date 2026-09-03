@@ -1,44 +1,83 @@
 #include <stdio.h>
 #include <string.h>
 
-// Function to execute a command
-void execute_command(const char *command) {
-    // Placeholder for command execution logic
-    printf("Command '%s' executed successfully.\n", command);
+typedef enum {
+    CMD_INVALID,
+    CMD_HELP,
+    CMD_LIST,
+    CMD_ADD,
+    CMD_REMOVE,
+    CMD_UPDATE,
+    CMD_EXIT
+} Command;
+
+Command parse_command(const char *command);
+void execute_command(Command command);
+
+Command parse_command(const char *command) {
+    const char *names[] = {
+        [CMD_HELP] = "help",
+        [CMD_LIST] = "list",
+        [CMD_ADD] = "add",
+        [CMD_REMOVE] = "remove",
+        [CMD_UPDATE] = "update",
+        [CMD_EXIT] = "exit"
+    };
+
+    for (int i = CMD_HELP; i <= CMD_EXIT; i++) {
+        if (strcmp(command, names[i]) == 0)
+            return i;
+    }
+
+    return CMD_INVALID;
 }
 
-// Function to check if the command is valid and execute it
-void check_command(const char *command, char commandList[6][256]) {
-    for (int i = 0; i < 6; i++) {
-        if (strcmp(command, commandList[i]) == 0) {
-            execute_command(command);
-            return;
-        }
+void execute_command(Command command) {
+    switch (command) {
+        case CMD_HELP:
+            printf("Available commands.\n");
+            break;
+        case CMD_LIST:
+            printf("Listing all items...\n");
+            break;
+        case CMD_ADD:
+            printf("Adding a new item...\n");
+            break;
+        case CMD_REMOVE:
+            printf("Removing an item...\n");
+            break;
+        case CMD_UPDATE:
+            printf("Updating an existing item...\n");
+            break;
+        default:
+            printf("Invalid command.\n");
+            break;
     }
-    printf("Invalid command: '%s'. Type 'help' for a list of commands.\n", command);
 }
 
 // Main function to run the CLI
-int main() {
-    while (1)  {
-        char commandList[6][256] = {
-            "help",
-            "list",
-            "add",
-            "remove",
-            "update",
-            "exit"
-        };
-        char command[256];
+int main(void) {
+
+    char input[256];
+
+    while (1) {
         printf("ServerVault CLI\n");
-        printf("Enter a commmand to execute:\n");
-        fgets(command, sizeof(command), stdin);
-        command[strcspn(command, "\n")] = 0;
-        if (strcmp(command, "exit") == 0) {
+        printf("Enter a command to execute:\n");
+
+        if (fgets(input, sizeof(input), stdin) == NULL)
+            break;
+
+        input[strcspn(input, "\n")] = '\0';
+
+        Command command = parse_command(input);
+
+        if (command == CMD_EXIT) {
             printf("Exiting ServerVault CLI.\n");
             break;
         }
-        check_command(command, commandList);
+
+        execute_command(command);
     }
+
     return 0;
 }
