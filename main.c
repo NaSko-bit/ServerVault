@@ -219,7 +219,18 @@ int main(int argc, char *argv[]) {
 
         int max_fd = confd > STDIN_FILENO ? confd : STDIN_FILENO;
 
-        if (select(max_fd + 1, &read_fds, NULL, NULL, NULL) < 0) {
+        struct timeval timeout;
+        timeout.tv_sec = 30;
+        timeout.tv_usec = 0;
+
+        int result = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
+
+        if (result == 0) {
+            printf("Timeout reached. Shutting down server.\n");
+            break;
+        }
+
+        if (result < 0) {
             perror("select failed");
             break;
         }
@@ -233,10 +244,14 @@ int main(int argc, char *argv[]) {
             }
 
             r_buff[valread] = '\0';
+            r_buff[strcspn(r_buff, "\r\n")] = '\0';
+
             printf("[client] %s\n", r_buff);
 
-            if (strcmp(r_buff, "exit") == 0)
+            if (strcmp(r_buff, "exit") == 0) {
+                printf("Client requested shutdown.\n");
                 break;
+            }
         }
 
         if (FD_ISSET(STDIN_FILENO, &read_fds)) {
@@ -246,7 +261,7 @@ int main(int argc, char *argv[]) {
             s_buff[strcspn(s_buff, "\r\n")] = '\0';
 
             if (strcmp(s_buff, "exit") == 0) {
-                send(confd, s_buff, strlen(s_buff), 0);
+                send(confd, "exit", 4, 0);
                 break;
             }
 
