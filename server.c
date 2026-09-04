@@ -1,5 +1,4 @@
 #include "server.h"
-
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdio.h>
@@ -8,6 +7,7 @@
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <time.h>
 
 #define PORT 2000
 #define BUFFER_SIZE 100
@@ -107,6 +107,8 @@ int start_server(void) {
 
             printf("[client] %s\n", receive_buffer);
 
+            command_respond(client_fd, receive_buffer);
+
             if (strcmp(receive_buffer, "exit") == 0)
                 break;
         }
@@ -131,4 +133,20 @@ int start_server(void) {
 
     printf("Server shut down cleanly.\n");
     return EXIT_SUCCESS;
+}
+
+void command_respond(int client_fd, const char *command) {
+    if (strcmp(command, "ping") != 0)
+        return;
+
+    const char response[] = "pong\n";
+
+    ssize_t sent = send(client_fd, response, strlen(response), MSG_NOSIGNAL);
+
+    if (sent < 0) {
+        perror("send");
+        return;
+    }
+
+    printf("Sent %zd bytes: %s", sent, response);
 }
