@@ -9,5 +9,6 @@ void move_file(const char *old_filename, const char *new_filename);
 void copy_file(const char *source, const char *destination);
 void list_files(const char *path);
 void change_directory(const char *path);
+void tcp_start();
 
 #endif

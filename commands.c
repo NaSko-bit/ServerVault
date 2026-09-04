@@ -129,3 +129,7 @@ void list_files(const char *path) {
 
     closedir(directory);
 }
+
+void tcp_start(void) {
+    printf("TCP server started.\n");
+}   
