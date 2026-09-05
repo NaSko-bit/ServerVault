@@ -57,24 +57,16 @@ static int send_message(int client_fd, const char *message) {
 }
 
 int start_server(void) {
-    int server_fd = -1;
-    int client_fd = -1;
-    int opt = 1;
-    char receive_buffer[BUFFER_SIZE];
-    char send_buffer[BUFFER_SIZE];
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) {
         perror("socket");
         return EXIT_FAILURE;
     }
 
-    if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR,
-                   &opt, sizeof(opt)) < 0) {
-        perror("setsockopt");
-        close(server_fd);
-        return EXIT_FAILURE;
-    }
+    int option = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR,
+               &option, sizeof(option));
 
     struct sockaddr_in address = {0};
     address.sin_family = AF_INET;
@@ -95,34 +87,16 @@ int start_server(void) {
 
     printf("Server listening on port %d...\n", PORT);
 
-    client_fd = accept(server_fd, NULL, NULL);
-    if (client_fd < 0) {
-        perror("accept");
-        close(server_fd);
-        return EXIT_FAILURE;
-    }
+    int server_running = 1;
 
-    printf("Client connected successfully.\n");
+    while (server_running) {
+        fd_set waiting_fds;
+        FD_ZERO(&waiting_fds);
+        FD_SET(server_fd, &waiting_fds);
+        FD_SET(STDIN_FILENO, &waiting_fds);
 
-    while (1) {
-        fd_set read_fds;
-        FD_ZERO(&read_fds);
-        FD_SET(client_fd, &read_fds);
-        FD_SET(STDIN_FILENO, &read_fds);
-
-        int max_fd = client_fd > STDIN_FILENO ? client_fd : STDIN_FILENO;
-
-        struct timeval timeout = {
-            .tv_sec = 60,
-            .tv_usec = 0
-        };
-
-        int result = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
-
-        if (result == 0) {
-            printf("Timeout reached.\n");
-            break;
-        }
+        int result = select(server_fd + 1, &waiting_fds,
+                            NULL, NULL, NULL);
 
         if (result < 0) {
             if (errno == EINTR)
@@ -132,45 +106,118 @@ int start_server(void) {
             break;
         }
 
-        if (FD_ISSET(client_fd, &read_fds)) {
-            ssize_t count = recv(client_fd, receive_buffer,
-                                 sizeof(receive_buffer) - 1, 0);
+        if (FD_ISSET(STDIN_FILENO, &waiting_fds)) {
+            char input[BUFFER_SIZE];
 
-            if (count <= 0) {
-                printf("Client disconnected.\n");
+            if (fgets(input, sizeof(input), stdin) == NULL)
+                break;
+
+            input[strcspn(input, "\r\n")] = '\0';
+
+            if (strcmp(input, "exit") == 0) {
+                printf("Shutting down server.\n");
+                break;
+            }
+        }
+
+        if (!FD_ISSET(server_fd, &waiting_fds))
+            continue;
+
+        int client_fd = accept(server_fd, NULL, NULL);
+
+        if (client_fd < 0) {
+            if (errno == EINTR)
+                continue;
+
+            perror("accept");
+            break;
+        }
+
+        printf("Client connected successfully.\n");
+
+        int client_connected = 1;
+
+        while (client_connected && server_running) {
+            fd_set read_fds;
+            FD_ZERO(&read_fds);
+            FD_SET(client_fd, &read_fds);
+            FD_SET(STDIN_FILENO, &read_fds);
+
+            int max_fd = client_fd > STDIN_FILENO
+                       ? client_fd
+                       : STDIN_FILENO;
+
+            result = select(max_fd + 1, &read_fds,
+                            NULL, NULL, NULL);
+
+            if (result < 0) {
+                if (errno == EINTR)
+                    continue;
+
+                perror("select");
                 break;
             }
 
-            receive_buffer[count] = '\0';
-            receive_buffer[strcspn(receive_buffer, "\r\n")] = '\0';
+            if (FD_ISSET(STDIN_FILENO, &read_fds)) {
+                char input[BUFFER_SIZE];
 
-            printf("[client] %s\n", receive_buffer);
+                if (fgets(input, sizeof(input), stdin) == NULL) {
+                    server_running = 0;
+                    break;
+                }
 
-            command_respond(client_fd, receive_buffer);
+                input[strcspn(input, "\r\n")] = '\0';
 
-            if (strcmp(receive_buffer, "exit") == 0)
-                break;
-        }
+                if (strcmp(input, "exit") == 0) {
+                    send_message(client_fd, "exit\n");
+                    server_running = 0;
+                    break;
+                }
 
-        if (FD_ISSET(STDIN_FILENO, &read_fds)) {
-            if (fgets(send_buffer, sizeof(send_buffer), stdin) == NULL)
-                break;
-
-            send_buffer[strcspn(send_buffer, "\r\n")] = '\0';
-
-            if (strcmp(send_buffer, "exit") == 0) {
-                send(client_fd, "exit", 4, 0);
-                break;
+                if (send_message(client_fd, input) < 0) {
+                    perror("send");
+                    client_connected = 0;
+                }
             }
 
-            send(client_fd, send_buffer, strlen(send_buffer), 0);
+            if (FD_ISSET(client_fd, &read_fds)) {
+                char receive_buffer[BUFFER_SIZE];
+
+                ssize_t count = recv(client_fd, receive_buffer,
+                                     sizeof(receive_buffer) - 1, 0);
+
+                if (count == 0) {
+                    printf("Client disconnected.\n");
+                    client_connected = 0;
+                    continue;
+                }
+
+                if (count < 0) {
+                    perror("recv");
+                    client_connected = 0;
+                    continue;
+                }
+
+                receive_buffer[count] = '\0';
+                receive_buffer[strcspn(receive_buffer, "\r\n")] = '\0';
+
+                if (strcmp(receive_buffer, "exit") == 0) {
+                    printf("Client requested disconnect.\n");
+                    client_connected = 0;
+                    continue;
+                }
+
+                command_respond(client_fd, receive_buffer);
+            }
         }
+
+        close(client_fd);
+        printf("Client connection closed.\n");
     }
 
-    close(client_fd);
     close(server_fd);
-
     printf("Server shut down cleanly.\n");
+
     return EXIT_SUCCESS;
 }
 
