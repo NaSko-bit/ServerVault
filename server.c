@@ -1,4 +1,5 @@
 #include "server.h"
+#include "log.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <stdio.h>
@@ -57,6 +58,8 @@ static int send_message(int client_fd, const char *message) {
 }
 
 int start_server(void) {
+    log_event("SERVER", "Server starting on port %d", PORT);
+
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (server_fd < 0) {
@@ -216,6 +219,8 @@ int start_server(void) {
     }
 
     close(server_fd);
+
+    log_event("SERVER", "Server stopped");
     printf("Server shut down cleanly.\n");
 
     return EXIT_SUCCESS;
