@@ -225,5 +225,106 @@ void receive_file(int client_fd, const char *filename,
     }
 
     fclose(file);
-    printf("Received %llu bytes as %s\n", total_received, destination);
+
+    printf("Received %llu bytes as %s\n",
+           total_received, destination);
+
+    file_orginize(destination);
+
+    const char response[] = "UPLOAD_COMPLETE\n";
+    send(client_fd, response, strlen(response), MSG_NOSIGNAL);
+}
+
+void file_orginize(const char *filepath) {
+    const char *filename = strrchr(filepath, '/');
+    filename = filename != NULL ? filename + 1 : filepath;
+
+    const char *extension = strrchr(filename, '.');
+
+    if (extension == NULL || extension == filename) {
+        fprintf(stderr, "Unsupported file type: %s\n", filename);
+        return;
+    }
+
+    const char *directory = NULL;
+
+    if (strcasecmp(extension, ".mp3") == 0 ||
+        strcasecmp(extension, ".wav") == 0 ||
+        strcasecmp(extension, ".ogg") == 0 ||
+        strcasecmp(extension, ".flac") == 0 ||
+        strcasecmp(extension, ".aac") == 0 ||
+        strcasecmp(extension, ".m4a") == 0) {
+        directory = "audio";
+    } else if (strcasecmp(extension, ".png") == 0 ||
+               strcasecmp(extension, ".jpg") == 0 ||
+               strcasecmp(extension, ".jpeg") == 0 ||
+               strcasecmp(extension, ".gif") == 0 ||
+               strcasecmp(extension, ".bmp") == 0 ||
+               strcasecmp(extension, ".webp") == 0) {
+        directory = "image";
+    } else if (strcasecmp(extension, ".pdf") == 0) {
+        directory = "pdf";
+    } else if (strcasecmp(extension, ".txt") == 0 ||
+               strcasecmp(extension, ".md") == 0 ||
+               strcasecmp(extension, ".csv") == 0 ||
+               strcasecmp(extension, ".log") == 0 ||
+               strcasecmp(extension, ".json") == 0 ||
+               strcasecmp(extension, ".xml") == 0 ||
+               strcasecmp(extension, ".doc") == 0 ||
+               strcasecmp(extension, ".docx") == 0) {
+        directory = "text";
+    } else if (strcasecmp(extension, ".mp4") == 0 ||
+               strcasecmp(extension, ".mkv") == 0 ||
+               strcasecmp(extension, ".avi") == 0 ||
+               strcasecmp(extension, ".mov") == 0 ||
+               strcasecmp(extension, ".webm") == 0 ||
+               strcasecmp(extension, ".mpeg") == 0 ||
+               strcasecmp(extension, ".mpg") == 0) {
+        directory = "video";
+    }
+
+    if (directory == NULL) {
+        fprintf(stderr, "Unsupported file type: %s\n", filename);
+        return;
+    }
+
+    char directory_path[PATH_MAX];
+
+    int length = snprintf(directory_path, sizeof(directory_path),
+                          "./Server/%s", directory);
+
+    if (length < 0 || (size_t)length >= sizeof(directory_path)) {
+        fprintf(stderr, "Directory path is too long.\n");
+        return;
+    }
+
+    struct stat info;
+
+    if (stat(directory_path, &info) != 0) {
+        if (errno != ENOENT || mkdir(directory_path, 0755) < 0) {
+            perror("mkdir");
+            return;
+        }
+    } else if (!S_ISDIR(info.st_mode)) {
+        fprintf(stderr, "%s is not a directory.\n", directory_path);
+        return;
+    }
+
+    char new_path[PATH_MAX];
+
+    length = snprintf(new_path, sizeof(new_path),
+                      "%s/%s", directory_path, filename);
+
+    if (length < 0 || (size_t)length >= sizeof(new_path)) {
+        fprintf(stderr, "Destination path is too long.\n");
+        return;
+    }
+
+    if (rename(filepath, new_path) < 0) {
+        fprintf(stderr, "Could not organize '%s' to '%s': %s\n",
+                filepath, new_path, strerror(errno));
+        return;
+    }
+
+    printf("Organized file: %s\n", new_path);
 }
