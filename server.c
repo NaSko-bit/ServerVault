@@ -77,6 +77,7 @@ int start_server(void) {
     address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
+        log_event("ERROR", "Bind failed: %s", strerror(errno));
         perror("bind");
         close(server_fd);
         return EXIT_FAILURE;
@@ -137,6 +138,7 @@ int start_server(void) {
         }
 
         printf("Client connected successfully.\n");
+        log_event("CLIENT", "Client connected");
 
         int client_connected = 1;
 
@@ -215,7 +217,7 @@ int start_server(void) {
         }
 
         close(client_fd);
-        printf("Client connection closed.\n");
+        log_event("CLIENT", "Client disconnected");
     }
 
     close(server_fd);
@@ -227,6 +229,8 @@ int start_server(void) {
 }
 
 void command_respond(int client_fd, const char *command) {
+    log_event("COMMAND", "Received command: %s", command);
+
     char operation[16];
     unsigned int file_count;
 
@@ -319,6 +323,10 @@ int receive_file(int client_fd, const char *filename,
     fclose(file);
 
     file_orginize(destination);
+
+    log_event("FILE",
+              "Received file: %s, size: %llu bytes",
+              destination, file_size);
 
     printf("Received and organized: %s\n", destination);
     return 0;

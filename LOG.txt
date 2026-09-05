@@ -1,0 +1,5 @@
+[2026-09-05 20:33:15] [SERVER] Server starting on port 2000
+[2026-09-05 20:33:27] [CLIENT] Client connected
+[2026-09-05 20:33:32] [CLIENT] Client disconnected
+[2026-09-05 20:33:32] [SERVER] Server stopped
+[2026-09-05 20:58:47] [COMMAND] help

@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <sys/select.h>
 #include "server.h"
+#include "log.h"
+
 
 #define PORT 2000
 #define BUFFER_SIZE 100
@@ -32,6 +34,7 @@ typedef enum {
 
 Command parse_command(const char *command);
 void execute_command(Command command, int argc, char *argv[]);
+static void log_cli_command(int argc, char *argv[]);
 
 Command parse_command(const char *command) {
     const char *names[] = {
@@ -149,22 +152,28 @@ void execute_command(Command command, int argc, char *argv[]) {
             printf("Invalid command.\n");
             break;
     }
+
 }
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
+        log_event("ERROR", "Command missing");
         printf("Usage: %s <command> [arguments...]\n", argv[0]);
         return EXIT_FAILURE;
     }
 
+    log_cli_command(argc, argv);
+
     Command command = parse_command(argv[1]);
 
     if (command == CMD_INVALID) {
+        log_event("ERROR", "Unknown command: %s", argv[1]);
         printf("Invalid command: %s\n", argv[1]);
         return EXIT_FAILURE;
     }
 
     if (command == CMD_EXIT) {
+        log_event("COMMAND", "Exit requested");
         printf("Exiting ServerVault.\n");
         return EXIT_SUCCESS;
     }
@@ -172,4 +181,21 @@ int main(int argc, char *argv[]) {
     execute_command(command, argc, argv);
 
     return EXIT_SUCCESS;
+}
+
+static void log_cli_command(int argc, char *argv[]) {
+    char command[1024] = {0};
+    size_t used = 0;
+
+    for (int i = 1; i < argc; i++) {
+        int written = snprintf(command + used, sizeof(command) - used,
+                               "%s%s", i == 1 ? "" : " ", argv[i]);
+
+        if (written < 0 || (size_t)written >= sizeof(command) - used)
+            break;
+
+        used += (size_t)written;
+    }
+
+    log_event("COMMAND", "%s", command);
 }
