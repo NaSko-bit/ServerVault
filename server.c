@@ -79,12 +79,7 @@ int start_server(void) {
     struct sockaddr_in address = {0};
     address.sin_family = AF_INET;
     address.sin_port = htons(PORT);
-
-    if (inet_pton(AF_INET, "127.0.0.1", &address.sin_addr) <= 0) {
-        perror("inet_pton");
-        close(server_fd);
-        return EXIT_FAILURE;
-    }
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
 
     if (bind(server_fd, (struct sockaddr *)&address, sizeof(address)) < 0) {
         perror("bind");
@@ -92,7 +87,7 @@ int start_server(void) {
         return EXIT_FAILURE;
     }
 
-    if (listen(server_fd, 1) < 0) {
+    if (listen(server_fd, 10) < 0) {
         perror("listen");
         close(server_fd);
         return EXIT_FAILURE;
@@ -122,7 +117,7 @@ int start_server(void) {
             .tv_usec = 0
         };
 
-        int result = select(max_fd + 1, &read_fds, NULL, NULL, &timeout);
+        int result = select(max_fd + 1, &read_fds, NULL, NULL, NULL);
 
         if (result == 0) {
             printf("Timeout reached.\n");
