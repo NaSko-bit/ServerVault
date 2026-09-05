@@ -6,8 +6,12 @@
 #include <string.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <time.h>
+#include <limits.h>
+#include <linux/limits.h>
+#include <strings.h>
 
 #define PORT 2000
 #define BUFFER_SIZE 100
@@ -74,7 +78,7 @@ int start_server(void) {
         int max_fd = client_fd > STDIN_FILENO ? client_fd : STDIN_FILENO;
 
         struct timeval timeout = {
-            .tv_sec = 30,
+            .tv_sec = 60,
             .tv_usec = 0
         };
 
@@ -136,17 +140,90 @@ int start_server(void) {
 }
 
 void command_respond(int client_fd, const char *command) {
-    if (strcmp(command, "ping") != 0)
-        return;
+    char operation[16];
+    char filename[PATH_MAX];
+    unsigned long long file_size;
 
-    const char response[] = "pong\n";
+    int fields = sscanf(command, "%15s %4095s %llu",
+                        operation, filename, &file_size);
 
-    ssize_t sent = send(client_fd, response, strlen(response), MSG_NOSIGNAL);
+    if (fields == 3 && strcasecmp(operation, "upload") == 0) {
+        if (send(client_fd, "READY\n", 6, MSG_NOSIGNAL) < 0) {
+            perror("send");
+            return;
+        }
 
-    if (sent < 0) {
-        perror("send");
+        receive_file(client_fd, filename, file_size);
         return;
     }
 
-    printf("Sent %zd bytes: %s", sent, response);
+    fprintf(stderr, "Unknown or invalid command: %s\n", command);
+}
+
+void receive_file(int client_fd, const char *filename,
+                  unsigned long long file_size) {
+    const char *base_name = strrchr(filename, '/');
+    base_name = base_name ? base_name + 1 : filename;
+
+    if (*base_name == '\0') {
+        fprintf(stderr, "Invalid filename.\n");
+        return;
+    }
+
+    struct stat info;
+
+    if (stat("./Server", &info) == 0) {
+        if (!S_ISDIR(info.st_mode)) {
+            fprintf(stderr, "./Server is not a directory.\n");
+            return;
+        }
+    } else if (errno == ENOENT) {
+        if (mkdir("./Server", 0777) < 0) {
+            perror("mkdir");
+            return;
+        }
+    } else {
+        perror("stat");
+        return;
+    }
+
+    char destination[PATH_MAX];
+
+    int length = snprintf(destination, sizeof(destination),
+                          "./Server/%s", base_name);
+
+    if (length < 0 || (size_t)length >= sizeof(destination)) {
+        fprintf(stderr, "Destination path is too long.\n");
+        return;
+    }
+
+    FILE *file = fopen(destination, "wb");
+    if (file == NULL) {
+        perror("fopen");
+        return;
+    }
+
+    char buffer[4096];
+    unsigned long long total_received = 0;
+
+    while (total_received < file_size) {
+        unsigned long long remaining = file_size - total_received;
+        size_t requested = remaining < sizeof(buffer)
+                         ? (size_t)remaining
+                         : sizeof(buffer);
+
+        ssize_t received = recv(client_fd, buffer, requested, 0);
+
+        if (received <= 0) {
+            perror("recv");
+            fclose(file);
+            return;
+        }
+
+        fwrite(buffer, 1, (size_t)received, file);
+        total_received += (unsigned long long)received;
+    }
+
+    fclose(file);
+    printf("Received %llu bytes as %s\n", total_received, destination);
 }
