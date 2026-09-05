@@ -16,6 +16,46 @@
 #define PORT 2000
 #define BUFFER_SIZE 100
 
+static ssize_t receive_line(int client_fd, char *buffer, size_t size) {
+    size_t position = 0;
+
+    while (position + 1 < size) {
+        char character;
+        ssize_t received = recv(client_fd, &character, 1, 0);
+
+        if (received <= 0)
+            return received;
+
+        if (character == '\n') {
+            buffer[position] = '\0';
+            return (ssize_t)position;
+        }
+
+        if (character != '\r')
+            buffer[position++] = character;
+    }
+
+    buffer[size - 1] = '\0';
+    return -1;
+}
+
+static int send_message(int client_fd, const char *message) {
+    size_t length = strlen(message);
+    size_t sent_total = 0;
+
+    while (sent_total < length) {
+        ssize_t sent = send(client_fd, message + sent_total,
+                            length - sent_total, MSG_NOSIGNAL);
+
+        if (sent <= 0)
+            return -1;
+
+        sent_total += (size_t)sent;
+    }
+
+    return 0;
+}
+
 int start_server(void) {
     int server_fd = -1;
     int client_fd = -1;
@@ -141,33 +181,25 @@ int start_server(void) {
 
 void command_respond(int client_fd, const char *command) {
     char operation[16];
-    char filename[PATH_MAX];
-    unsigned long long file_size;
+    unsigned int file_count;
 
-    int fields = sscanf(command, "%15s %4095s %llu",
-                        operation, filename, &file_size);
-
-    if (fields == 3 && strcasecmp(operation, "upload") == 0) {
-        if (send(client_fd, "READY\n", 6, MSG_NOSIGNAL) < 0) {
-            perror("send");
-            return;
-        }
-
-        receive_file(client_fd, filename, file_size);
+    if (sscanf(command, "%15s %u", operation, &file_count) == 2 &&
+        strcasecmp(operation, "sync") == 0) {
+        sync_files(client_fd, file_count);
         return;
     }
 
     fprintf(stderr, "Unknown or invalid command: %s\n", command);
 }
 
-void receive_file(int client_fd, const char *filename,
-                  unsigned long long file_size) {
+int receive_file(int client_fd, const char *filename,
+                 unsigned long long file_size) {
     const char *base_name = strrchr(filename, '/');
     base_name = base_name ? base_name + 1 : filename;
 
     if (*base_name == '\0') {
         fprintf(stderr, "Invalid filename.\n");
-        return;
+        return -1;
     }
 
     struct stat info;
@@ -175,16 +207,16 @@ void receive_file(int client_fd, const char *filename,
     if (stat("./Server", &info) == 0) {
         if (!S_ISDIR(info.st_mode)) {
             fprintf(stderr, "./Server is not a directory.\n");
-            return;
+            return -1;
         }
     } else if (errno == ENOENT) {
         if (mkdir("./Server", 0777) < 0) {
             perror("mkdir");
-            return;
+            return -1;
         }
     } else {
         perror("stat");
-        return;
+        return -1;
     }
 
     char destination[PATH_MAX];
@@ -194,13 +226,13 @@ void receive_file(int client_fd, const char *filename,
 
     if (length < 0 || (size_t)length >= sizeof(destination)) {
         fprintf(stderr, "Destination path is too long.\n");
-        return;
+        return -1;
     }
 
     FILE *file = fopen(destination, "wb");
     if (file == NULL) {
         perror("fopen");
-        return;
+        return -1;
     }
 
     char buffer[4096];
@@ -214,25 +246,35 @@ void receive_file(int client_fd, const char *filename,
 
         ssize_t received = recv(client_fd, buffer, requested, 0);
 
-        if (received <= 0) {
-            perror("recv");
+        if (received == 0) {
+            fprintf(stderr, "Client disconnected during file transfer.\n");
             fclose(file);
-            return;
+            return -1;
         }
 
-        fwrite(buffer, 1, (size_t)received, file);
+        if (received < 0) {
+            perror("recv");
+            fclose(file);
+            return -1;
+        }
+
+        size_t written = fwrite(buffer, 1, (size_t)received, file);
+
+        if (written != (size_t)received) {
+            perror("fwrite");
+            fclose(file);
+            return -1;
+        }
+
         total_received += (unsigned long long)received;
     }
 
     fclose(file);
 
-    printf("Received %llu bytes as %s\n",
-           total_received, destination);
-
     file_orginize(destination);
 
-    const char response[] = "UPLOAD_COMPLETE\n";
-    send(client_fd, response, strlen(response), MSG_NOSIGNAL);
+    printf("Received and organized: %s\n", destination);
+    return 0;
 }
 
 void file_orginize(const char *filepath) {
@@ -328,3 +370,66 @@ void file_orginize(const char *filepath) {
 
     printf("Organized file: %s\n", new_path);
 }
+
+void sync_directory_files(const char *directory) {
+    char command[PATH_MAX + 50];
+
+    int length = snprintf(command, sizeof(command),
+                          "rsync -av --ignore-existing ./Server/%s/ ./ServerVault/%s/",
+                          directory, directory);
+
+    if (length < 0 || (size_t)length >= sizeof(command)) {
+        fprintf(stderr, "Command is too long.\n");
+        return;
+    }
+
+    int result = system(command);
+
+    if (result != 0) {
+        fprintf(stderr, "Failed to sync files from '%s' to ServerVault.\n", directory);
+    } else {
+        printf("Files from '%s' synced to ServerVault successfully.\n", directory);
+    }
+}
+
+void sync_files(int client_fd, unsigned int file_count) {
+    char header[PATH_MAX + 64];
+
+    if (send_message(client_fd, "SYNC_READY\n") < 0)
+        return;
+
+    for (unsigned int i = 0; i < file_count; i++) {
+        ssize_t length = receive_line(client_fd, header, sizeof(header));
+
+        if (length <= 0) {
+            fprintf(stderr, "Client disconnected during synchronization.\n");
+            return;
+        }
+
+        char filename[PATH_MAX];
+        unsigned long long file_size;
+
+        if (sscanf(header, "FILE %4095s %llu",
+                   filename, &file_size) != 2) {
+            send_message(client_fd, "ERROR Invalid file header\n");
+            return;
+        }
+
+        if (send_message(client_fd, "READY\n") < 0)
+            return;
+
+        if (receive_file(client_fd, filename, file_size) != 0) {
+            send_message(client_fd, "ERROR FILE_RECEIVE_FAILED\n");
+            return;
+        }
+
+        if (send_message(client_fd, "FILE_STORED\n") < 0)
+            return;
+    }
+
+    ssize_t length = receive_line(client_fd, header, sizeof(header));
+
+    if (length > 0 && strcmp(header, "SYNC_DONE") == 0)
+        send_message(client_fd, "SYNC_COMPLETE\n");
+}
+
