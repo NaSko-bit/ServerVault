@@ -52,7 +52,7 @@ def refresh_logs():
     except OSError as error:
         lines = [f"Unable to read LOG.txt: {error}"]
 
-    log_label.setText("\n".join(lines[-LOG_LINES_TO_SHOW:]) or "No logs yet.")
+    log_label.setText("\n".join(lines[:LOG_LINES_TO_SHOW]) or "No logs yet.")
     refresh_client_info(lines)
 
 
@@ -61,13 +61,14 @@ def refresh_client_info(lines):
         set_client_info()
         return
 
+    chronological_lines = list(reversed(lines))
     server_start = -1
-    for index, line in enumerate(lines):
+    for index, line in enumerate(chronological_lines):
         if "[SERVER] Server starting on port" in line:
             server_start = index
 
     client = None
-    for line in lines[server_start + 1:]:
+    for line in chronological_lines[server_start + 1:]:
         if "[CLIENT] Client disconnected:" in line:
             client = None
             continue
