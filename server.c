@@ -16,6 +16,7 @@
 
 #define PORT 2000
 #define BUFFER_SIZE 100
+#define DEVICE_TYPE_SIZE 64
 
 static ssize_t receive_line(int client_fd, char *buffer, size_t size) {
     size_t position = 0;
@@ -55,6 +56,47 @@ static int send_message(int client_fd, const char *message) {
     }
 
     return 0;
+}
+
+static int read_device_type(const char *message, char *device_type,
+                            size_t device_type_size) {
+    const char prefix[] = "DEVICE_TYPE ";
+    size_t prefix_size = sizeof(prefix) - 1;
+
+    if (strncasecmp(message, prefix, prefix_size) != 0)
+        return 0;
+
+    const char *value = message + prefix_size;
+    while (*value == ' ' || *value == '\t')
+        value++;
+
+    if (*value == '\0')
+        return -1;
+
+    int written = snprintf(device_type, device_type_size, "%s", value);
+    if (written < 0 || (size_t)written >= device_type_size)
+        return -1;
+
+    return 1;
+}
+
+static void get_client_ip(const struct sockaddr_storage *address,
+                          char *client_ip, size_t client_ip_size) {
+    const void *source = NULL;
+
+    if (address->ss_family == AF_INET) {
+        const struct sockaddr_in *ipv4 =
+            (const struct sockaddr_in *)address;
+        source = &ipv4->sin_addr;
+    } else if (address->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *ipv6 =
+            (const struct sockaddr_in6 *)address;
+        source = &ipv6->sin6_addr;
+    }
+
+    if (source == NULL || inet_ntop(address->ss_family, source,
+                                    client_ip, client_ip_size) == NULL)
+        snprintf(client_ip, client_ip_size, "unknown");
 }
 
 int start_server(void) {
@@ -127,7 +169,11 @@ int start_server(void) {
         if (!FD_ISSET(server_fd, &waiting_fds))
             continue;
 
-        int client_fd = accept(server_fd, NULL, NULL);
+        struct sockaddr_storage client_address;
+        socklen_t client_address_size = sizeof(client_address);
+        int client_fd = accept(server_fd,
+                       (struct sockaddr *)&client_address,
+                       &client_address_size);
 
         if (client_fd < 0) {
             if (errno == EINTR)
@@ -137,8 +183,14 @@ int start_server(void) {
             break;
         }
 
-        printf("Client connected successfully.\n");
-        log_event("CLIENT", "Client connected");
+        char client_ip[INET6_ADDRSTRLEN] = "unknown";
+        get_client_ip(&client_address, client_ip, sizeof(client_ip));
+
+        char device_type[DEVICE_TYPE_SIZE] = "unknown";
+
+        printf("Client connected successfully from %s.\n", client_ip);
+        log_event("CLIENT", "Client connected: ip=%s device_type=%s",
+                  client_ip, device_type);
 
         int client_connected = 1;
 
@@ -212,12 +264,30 @@ int start_server(void) {
                     continue;
                 }
 
+                int identity_result = read_device_type(
+                    receive_buffer, device_type, sizeof(device_type));
+
+                if (identity_result == 1) {
+                    log_event("CLIENT",
+                              "Client identity: ip=%s device_type=%s",
+                              client_ip, device_type);
+                    continue;
+                }
+
+                if (identity_result == -1) {
+                    log_event("ERROR",
+                              "Invalid device type from ip=%s",
+                              client_ip);
+                    continue;
+                }
+
                 command_respond(client_fd, receive_buffer);
             }
         }
 
         close(client_fd);
-        log_event("CLIENT", "Client disconnected");
+        log_event("CLIENT", "Client disconnected: ip=%s device_type=%s",
+              client_ip, device_type);
     }
 
     close(server_fd);
