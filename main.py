@@ -89,6 +89,9 @@ def server_process_finished(_exit_code, _exit_status):
     set_client_info()
     refresh_logs()
 
+def log_button_clicked():
+    subprocess.Popen(["xdg-open", str(LOG_FILE)])
+
 def memory_button_clicked():
     subprocess.Popen(["xdg-open", str(SERVERMEMORY_DIR)])
 
@@ -134,6 +137,7 @@ log_layout.setContentsMargins(6, 6, 6, 6)
 log_layout.addWidget(log_label)
 window.scrollArea.setWidgetResizable(True)
 
+window.pushButton.clicked.connect(log_button_clicked)
 window.pushButton_2.clicked.connect(server_button_clicked)
 window.pushButton_3.clicked.connect(memory_button_clicked)
 window.scrollArea.verticalScrollBar().setValue(
