@@ -86,6 +86,7 @@ def refresh_client_info(lines):
 
 def server_process_finished(_exit_code, _exit_status):
     window.pushButton_2.setText("Start Server")
+    window.pushButton_2.setEnabled(True)
     set_server_status(False)
     set_client_info()
     refresh_logs()
@@ -125,6 +126,7 @@ def server_button_clicked():
 
     if not SERVER_EXECUTABLE.is_file():
         window.label.setText("Server executable not found")
+        window.pushButton_2.setEnabled(True)
         return
 
     server_process.setWorkingDirectory(str(PROJECT_DIR))
@@ -132,6 +134,7 @@ def server_button_clicked():
 
     if not server_process.waitForStarted(1000):
         window.label.setText("Could not start server")
+        window.pushButton_2.setEnabled(True)
         refresh_logs()
         return
 

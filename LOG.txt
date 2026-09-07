@@ -1,3 +1,30 @@
+[2026-09-07 20:45:59] [SERVER] Server stopped
+[2026-09-07 20:45:34] [CLIENT] Client disconnected: ip=100.85.233.73 port=59854 device_type=unknown
+[2026-09-07 20:45:34] [CLIENT] Client kicked: ip=100.85.233.73 port=59854 device_type=unknown
+[2026-09-07 20:44:58] [CLIENT] Client connected: ip=100.85.233.73 port=59854 device_type=unknown
+[2026-09-07 20:44:39] [SERVER] Server starting on port 2000
+[2026-09-07 20:44:39] [COMMAND] tcp_start
+[2026-09-07 20:42:26] [SERVER] Server stopped
+[2026-09-07 20:42:25] [SERVER] Server starting on port 2000
+[2026-09-07 20:42:25] [COMMAND] tcp_start
+[2026-09-07 20:42:25] [SERVER] Server stopped
+[2026-09-07 20:42:25] [SERVER] Server starting on port 2000
+[2026-09-07 20:42:25] [COMMAND] tcp_start
+[2026-09-07 20:42:25] [SERVER] Server stopped
+[2026-09-07 20:42:25] [SERVER] Server starting on port 2000
+[2026-09-07 20:42:25] [COMMAND] tcp_start
+[2026-09-07 20:42:24] [SERVER] Server stopped
+[2026-09-07 20:42:24] [SERVER] Server starting on port 2000
+[2026-09-07 20:42:24] [COMMAND] tcp_start
+[2026-09-07 20:42:23] [SERVER] Server stopped
+[2026-09-07 20:42:22] [SERVER] Server starting on port 2000
+[2026-09-07 20:42:22] [COMMAND] tcp_start
+[2026-09-07 20:41:47] [SERVER] Server stopped
+[2026-09-07 20:41:47] [SERVER] Server starting on port 2000
+[2026-09-07 20:41:47] [COMMAND] tcp_start
+[2026-09-07 20:41:47] [SERVER] Server stopped
+[2026-09-07 20:41:47] [SERVER] Server starting on port 2000
+[2026-09-07 20:41:47] [COMMAND] tcp_start
 [2026-09-07 20:33:17] [SERVER] Server stopped
 [2026-09-07 20:33:16] [SERVER] Server starting on port 2000
 [2026-09-07 20:33:16] [COMMAND] tcp_start
