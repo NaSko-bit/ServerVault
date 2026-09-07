@@ -3,7 +3,7 @@ import re
 import socket
 import subprocess
 from PySide6.QtUiTools import QUiLoader
-from PySide6.QtCore import QProcess, QTimer
+from PySide6.QtCore import QEvent, QObject, QProcess, QTimer, Qt
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout
 
 
@@ -100,6 +100,22 @@ def disconnect_client_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
         server_process.write(b"kick\n")
 
+
+class CommandInputFilter(QObject):
+    def eventFilter(self, watched, event):
+        if watched is window.textEdit and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter) and \
+                    not event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                command = window.textEdit.toPlainText().strip()
+                if command and server_process.state() == \
+                        QProcess.ProcessState.Running:
+                    server_process.write((command + "\n").encode("utf-8"))
+                    window.textEdit.clear()
+                return True
+
+        return super().eventFilter(watched, event)
+
+
 def server_button_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
         server_process.write(b"exit\n")
@@ -146,6 +162,8 @@ window.pushButton.clicked.connect(log_button_clicked)
 window.pushButton_2.clicked.connect(server_button_clicked)
 window.pushButton_3.clicked.connect(memory_button_clicked)
 window.pushButton_4.clicked.connect(disconnect_client_clicked)
+command_input_filter = CommandInputFilter(window)
+window.textEdit.installEventFilter(command_input_filter)
 window.scrollArea.verticalScrollBar().setValue(
     window.scrollArea.verticalScrollBar().maximum()
 )
