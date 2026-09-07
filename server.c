@@ -99,6 +99,23 @@ static void get_client_ip(const struct sockaddr_storage *address,
         snprintf(client_ip, client_ip_size, "unknown");
 }
 
+static unsigned short get_client_port(
+    const struct sockaddr_storage *address) {
+    if (address->ss_family == AF_INET) {
+        const struct sockaddr_in *ipv4 =
+            (const struct sockaddr_in *)address;
+        return ntohs(ipv4->sin_port);
+    }
+
+    if (address->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *ipv6 =
+            (const struct sockaddr_in6 *)address;
+        return ntohs(ipv6->sin6_port);
+    }
+
+    return 0;
+}
+
 int start_server(void) {
     log_event("SERVER", "Server starting on port %d", PORT);
 
@@ -185,12 +202,14 @@ int start_server(void) {
 
         char client_ip[INET6_ADDRSTRLEN] = "unknown";
         get_client_ip(&client_address, client_ip, sizeof(client_ip));
+        unsigned short client_port = get_client_port(&client_address);
 
         char device_type[DEVICE_TYPE_SIZE] = "unknown";
 
         printf("Client connected successfully from %s.\n", client_ip);
-        log_event("CLIENT", "Client connected: ip=%s device_type=%s",
-                  client_ip, device_type);
+        log_event("CLIENT",
+              "Client connected: ip=%s port=%hu device_type=%s",
+              client_ip, client_port, device_type);
 
         int client_connected = 1;
 
@@ -269,8 +288,8 @@ int start_server(void) {
 
                 if (identity_result == 1) {
                     log_event("CLIENT",
-                              "Client identity: ip=%s device_type=%s",
-                              client_ip, device_type);
+                              "Client identity: ip=%s port=%hu device_type=%s",
+                              client_ip, client_port, device_type);
                     continue;
                 }
 
@@ -286,8 +305,9 @@ int start_server(void) {
         }
 
         close(client_fd);
-        log_event("CLIENT", "Client disconnected: ip=%s device_type=%s",
-              client_ip, device_type);
+          log_event("CLIENT",
+                "Client disconnected: ip=%s port=%hu device_type=%s",
+                client_ip, client_port, device_type);
     }
 
     close(server_fd);
