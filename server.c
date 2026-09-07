@@ -250,6 +250,15 @@ int start_server(void) {
                     break;
                 }
 
+                if (strcmp(input, "kick") == 0) {
+                    log_event("CLIENT",
+                              "Client kicked: ip=%s port=%hu device_type=%s",
+                              client_ip, client_port, device_type);
+                    send_message(client_fd, "exit\n");
+                    client_connected = 0;
+                    continue;
+                }
+
                 if (send_message(client_fd, input) < 0) {
                     perror("send");
                     client_connected = 0;

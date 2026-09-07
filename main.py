@@ -96,6 +96,10 @@ def log_button_clicked():
 def memory_button_clicked():
     subprocess.Popen(["xdg-open", str(SERVERMEMORY_DIR)])
 
+def disconnect_client_clicked():
+    if server_process.state() == QProcess.ProcessState.Running:
+        server_process.write(b"kick\n")
+
 def server_button_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
         server_process.write(b"exit\n")
@@ -141,6 +145,7 @@ window.scrollArea.setWidgetResizable(True)
 window.pushButton.clicked.connect(log_button_clicked)
 window.pushButton_2.clicked.connect(server_button_clicked)
 window.pushButton_3.clicked.connect(memory_button_clicked)
+window.pushButton_4.clicked.connect(disconnect_client_clicked)
 window.scrollArea.verticalScrollBar().setValue(
     window.scrollArea.verticalScrollBar().maximum()
 )
