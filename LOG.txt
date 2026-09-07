@@ -44,3 +44,8 @@
 [2026-09-07 16:53:51] [CLIENT] Client connected: ip=100.85.233.73 device_type=unknown
 [2026-09-07 16:54:01] [CLIENT] Client disconnected: ip=100.85.233.73 device_type=unknown
 [2026-09-07 16:54:01] [SERVER] Server stopped
+[2026-09-07 17:45:34] [COMMAND] tcp_start
+[2026-09-07 17:45:34] [SERVER] Server starting on port 2000
+[2026-09-07 17:47:23] [CLIENT] Client connected: ip=100.85.233.73 device_type=unknown
+[2026-09-07 17:47:41] [CLIENT] Client disconnected: ip=100.85.233.73 device_type=unknown
+[2026-09-07 17:47:47] [SERVER] Server stopped
