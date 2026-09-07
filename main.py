@@ -1,12 +1,13 @@
 from pathlib import Path
 import re
 import socket
-
+import subprocess
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QProcess, QTimer
 from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout
 
 
+SERVERMEMORY_DIR = "./Server"
 PROJECT_DIR = Path(__file__).resolve().parent
 UI_FILE = PROJECT_DIR / "MainWindow.ui"
 SERVER_EXECUTABLE = PROJECT_DIR / "server"
@@ -88,6 +89,8 @@ def server_process_finished(_exit_code, _exit_status):
     set_client_info()
     refresh_logs()
 
+def memory_button_clicked():
+    subprocess.Popen(["xdg-open", str(SERVERMEMORY_DIR)])
 
 def server_button_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
@@ -132,9 +135,11 @@ log_layout.addWidget(log_label)
 window.scrollArea.setWidgetResizable(True)
 
 window.pushButton_2.clicked.connect(server_button_clicked)
+window.pushButton_3.clicked.connect(memory_button_clicked)
 window.scrollArea.verticalScrollBar().setValue(
     window.scrollArea.verticalScrollBar().maximum()
 )
+
 
 log_timer = QTimer(window)
 log_timer.timeout.connect(refresh_logs)
