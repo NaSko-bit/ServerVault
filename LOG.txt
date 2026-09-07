@@ -34,3 +34,13 @@
 [2026-09-06 21:14:02] [COMMAND] tcp_start
 [2026-09-06 21:14:02] [SERVER] Server starting on port 2000
 [2026-09-06 21:14:02] [SERVER] Server stopped
+[2026-09-07 16:51:16] [COMMAND] tcp_start
+[2026-09-07 16:51:16] [SERVER] Server starting on port 2000
+[2026-09-07 16:51:53] [CLIENT] Client connected
+[2026-09-07 16:52:29] [CLIENT] Client disconnected
+[2026-09-07 16:52:31] [SERVER] Server stopped
+[2026-09-07 16:53:44] [COMMAND] tcp_start
+[2026-09-07 16:53:44] [SERVER] Server starting on port 2000
+[2026-09-07 16:53:51] [CLIENT] Client connected: ip=100.85.233.73 device_type=unknown
+[2026-09-07 16:54:01] [CLIENT] Client disconnected: ip=100.85.233.73 device_type=unknown
+[2026-09-07 16:54:01] [SERVER] Server stopped
