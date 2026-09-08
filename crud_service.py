@@ -30,6 +30,21 @@ def fetch_table(table_name):
     return columns, rows
 
 
+def execute_query(query):
+    query = query.strip()
+    if not query:
+        raise ValueError("Enter a SQL query")
+
+    with sqlite3.connect(LOG_DATABASE) as database:
+        cursor = database.execute(query)
+
+        if cursor.description is None:
+            return ["Result"], [(f"{cursor.rowcount} row(s) affected",)]
+
+        columns = [description[0] for description in cursor.description]
+        return columns, cursor.fetchall()
+
+
 def update_table(table_name, columns, original_rows, updated_rows):
     with sqlite3.connect(LOG_DATABASE) as database:
         table_info = database.execute(

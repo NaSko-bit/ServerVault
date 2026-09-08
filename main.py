@@ -17,7 +17,7 @@ from log_service import (
     fetch_recent_logs,
     find_connected_client,
 )
-from crud_service import fetch_table, list_tables, update_table
+from crud_service import execute_query, fetch_table, list_tables, update_table
 from system_service import get_host_ip, open_path
 
 
@@ -88,15 +88,7 @@ def load_crud_table(table_name):
         crud_table_name = table_name
         crud_columns = columns
         crud_original_rows = rows
-        crud_model.setHorizontalHeaderLabels(columns)
-        for row in rows:
-            items = []
-            for value in row:
-                item = QStandardItem("" if value is None else str(value))
-                item.setData(value, Qt.ItemDataRole.UserRole)
-                items.append(item)
-            crud_model.appendRow(items)
-        crud_table_view.resizeColumnsToContents()
+        display_crud_rows(columns, rows)
         crud_window.statusBar().showMessage(
             f"Loaded {len(rows)} rows from {table_name}"
         )
@@ -106,6 +98,31 @@ def load_crud_table(table_name):
             QStandardItem(f"Unable to load {table_name}: {error}")
         ])
         crud_window.statusBar().showMessage("Could not load table")
+
+
+def display_crud_rows(columns, rows):
+    crud_model.clear()
+    crud_model.setHorizontalHeaderLabels(columns)
+    for row in rows:
+        crud_model.appendRow([
+            QStandardItem("" if value is None else str(value))
+            for value in row
+        ])
+    crud_table_view.resizeColumnsToContents()
+
+
+def execute_crud_query():
+    global crud_table_name
+
+    try:
+        columns, rows = execute_query(crud_window.textEdit.toPlainText())
+        crud_table_name = None
+        display_crud_rows(columns, rows)
+        crud_window.statusBar().showMessage(
+            f"Query returned {len(rows)} row(s)"
+        )
+    except Exception as error:
+        crud_window.statusBar().showMessage(f"Query failed: {error}")
 
 
 def update_crud_table():
@@ -139,7 +156,7 @@ def update_crud_table():
 
 
 def initialize_crud_window():
-    global crud_model, crud_table_view
+    global crud_model, crud_table_view, query_input_filter
 
     crud_model = QStandardItemModel(crud_window)
     crud_table_view = crud_window.tableView
@@ -150,6 +167,8 @@ def initialize_crud_window():
 
     crud_window.comboBox.currentTextChanged.connect(load_crud_table)
     crud_window.pushButton.clicked.connect(update_crud_table)
+    query_input_filter = CrudQueryInputFilter(crud_window)
+    crud_window.textEdit.installEventFilter(query_input_filter)
     crud_window.comboBox.clear()
 
     try:
@@ -197,6 +216,20 @@ class CommandInputFilter(QObject):
         return super().eventFilter(watched, event)
 
 
+class CrudQueryInputFilter(QObject):
+    def eventFilter(self, watched, event):
+        if watched is crud_window.textEdit and \
+                event.type() == QEvent.Type.KeyPress and \
+                event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                return super().eventFilter(watched, event)
+
+            execute_crud_query()
+            return True
+
+        return super().eventFilter(watched, event)
+
+
 def server_button_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
         server_process.write(b"exit\n")
@@ -233,6 +266,7 @@ crud_table_view = None
 crud_table_name = None
 crud_columns = []
 crud_original_rows = []
+query_input_filter = None
 
 log_model = QStandardItemModel(window)
 log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
