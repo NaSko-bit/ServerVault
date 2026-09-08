@@ -17,6 +17,7 @@ from log_service import (
     fetch_recent_logs,
     find_connected_client,
 )
+from crud_service import fetch_table, list_tables
 from system_service import get_host_ip, open_path
 
 
@@ -77,11 +78,61 @@ def log_button_clicked():
 def memory_button_clicked():
     open_path(SERVERMEMORY_DIR)
 
+def load_crud_table(table_name):
+    crud_model.clear()
+
+    try:
+        columns, rows = fetch_table(table_name)
+        crud_model.setHorizontalHeaderLabels(columns)
+        for row in rows:
+            crud_model.appendRow([
+                QStandardItem("" if value is None else str(value))
+                for value in row
+            ])
+        crud_table_view.resizeColumnsToContents()
+        crud_window.statusBar().showMessage(
+            f"Loaded {len(rows)} rows from {table_name}"
+        )
+    except Exception as error:
+        crud_model.setHorizontalHeaderLabels(["Error"])
+        crud_model.appendRow([
+            QStandardItem(f"Unable to load {table_name}: {error}")
+        ])
+        crud_window.statusBar().showMessage("Could not load table")
+
+
+def initialize_crud_window():
+    global crud_model, crud_table_view
+
+    crud_model = QStandardItemModel(crud_window)
+    crud_table_view = crud_window.tableView
+    crud_table_view.setModel(crud_model)
+    crud_table_view.setAlternatingRowColors(True)
+    crud_table_view.setSortingEnabled(False)
+    crud_table_view.verticalHeader().setVisible(False)
+
+    crud_window.comboBox.currentTextChanged.connect(load_crud_table)
+    crud_window.comboBox.clear()
+
+    try:
+        tables = list_tables()
+        crud_window.comboBox.addItems(tables)
+        if tables:
+            load_crud_table(tables[0])
+        else:
+            crud_window.statusBar().showMessage("No database tables found")
+    except Exception as error:
+        crud_window.statusBar().showMessage(
+            f"Unable to list database tables: {error}"
+        )
+
+
 def crud_window_clicked():
     global crud_window
 
     if crud_window is None:
         crud_window = QUiLoader().load(str(CRUD_UI_FILE), window)
+        initialize_crud_window()
 
     if crud_window is not None:
         crud_window.show()
@@ -139,6 +190,8 @@ def server_button_clicked():
 app = QApplication([])
 window = QUiLoader().load(str(UI_FILE))
 crud_window = None
+crud_model = None
+crud_table_view = None
 
 log_model = QStandardItemModel(window)
 log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
