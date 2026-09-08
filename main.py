@@ -1,5 +1,6 @@
 from pathlib import Path
 import re
+import sqlite3
 import socket
 import subprocess
 from PySide6.QtUiTools import QUiLoader
@@ -11,7 +12,7 @@ SERVERMEMORY_DIR = "./Server"
 PROJECT_DIR = Path(__file__).resolve().parent
 UI_FILE = PROJECT_DIR / "MainWindow.ui"
 SERVER_EXECUTABLE = PROJECT_DIR / "server"
-LOG_FILE = PROJECT_DIR / "LOG.txt"
+LOG_DATABASE = PROJECT_DIR.parent / "ServerVaultDB"
 LOG_LINES_TO_SHOW = 20
 SERVER_PORT = 2000
 CLIENT_LINE_PATTERN = re.compile(
@@ -48,9 +49,24 @@ def set_client_info(client=None):
 
 def refresh_logs():
     try:
-        lines = LOG_FILE.read_text(encoding="utf-8", errors="replace").splitlines()
-    except OSError as error:
-        lines = [f"Unable to read LOG.txt: {error}"]
+        with sqlite3.connect(LOG_DATABASE) as database:
+            database.execute(
+                "CREATE TABLE IF NOT EXISTS LOGS ("
+                "LogID INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "TImeStamp TEXT NOT NULL, "
+                "Source TEXT NOT NULL, "
+                "LogInfo TEXT NOT NULL"
+                ")"
+            )
+            rows = database.execute(
+                "SELECT TImeStamp, Source, LogInfo "
+                "FROM LOGS ORDER BY LogID DESC LIMIT ?",
+                (LOG_LINES_TO_SHOW,),
+            ).fetchall()
+        lines = [f"[{timestamp}] [{source}] {info}"
+                 for timestamp, source, info in rows]
+    except (OSError, sqlite3.Error) as error:
+        lines = [f"Unable to read ServerVaultDB: {error}"]
 
     log_label.setText("\n".join(lines[:LOG_LINES_TO_SHOW]) or "No logs yet.")
     refresh_client_info(lines)
@@ -92,7 +108,7 @@ def server_process_finished(_exit_code, _exit_status):
     refresh_logs()
 
 def log_button_clicked():
-    subprocess.Popen(["xdg-open", str(LOG_FILE)])
+    subprocess.Popen(["xdg-open", str(LOG_DATABASE)])
 
 def memory_button_clicked():
     subprocess.Popen(["xdg-open", str(SERVERMEMORY_DIR)])

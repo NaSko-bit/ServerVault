@@ -7,7 +7,7 @@ ANDROID GUI build on top of C back-end. A way for server users, to save files, e
 ## Client identity
 
 When a TCP client connects, the host records its numeric IP address in
-`LOG.txt`. The client should send its device type as the first newline-terminated
+the `LOGS` table in `ServerVaultDB`. The client should send its device type as the first newline-terminated
 message:
 
 ```text

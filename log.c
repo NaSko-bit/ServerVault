@@ -8,9 +8,31 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <unistd.h>
+#include <sqlite3.h>
 
-#define LOG_FILE "LOG.txt"
+#define LOG_DATABASE "../ServerVaultDB"
+
+static int initialize_database(sqlite3 *database) {
+    const char *create_table =
+        "CREATE TABLE IF NOT EXISTS LOGS ("
+        "LogID INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "TImeStamp TEXT NOT NULL, "
+        "Source TEXT NOT NULL, "
+        "LogInfo TEXT NOT NULL"
+        ")";
+    char *error_message = NULL;
+    int result = sqlite3_exec(database, create_table, NULL, NULL,
+                              &error_message);
+
+    if (result != SQLITE_OK) {
+        fprintf(stderr, "Could not create log table: %s\n",
+                error_message != NULL ? error_message : "unknown error");
+        sqlite3_free(error_message);
+        return 0;
+    }
+
+    return 1;
+}
 
 void log_event(const char *level, const char *format, ...) {
     time_t current_time = time(NULL);
@@ -35,25 +57,14 @@ void log_event(const char *level, const char *format, ...) {
         return;
     }
 
-    size_t entry_size = (size_t)message_size + strlen(time_text)
-                      + strlen(level) + 8;
+    size_t entry_size = (size_t)message_size + 1;
     char *entry = malloc(entry_size);
     if (entry == NULL) {
         va_end(arguments);
         return;
     }
 
-    int written = snprintf(entry, entry_size, "[%s] [%s] ",
-                           time_text, level);
-    if (written < 0 || (size_t)written >= entry_size) {
-        free(entry);
-        va_end(arguments);
-        return;
-    }
-
-    int message_written = vsnprintf(entry + written,
-                                    entry_size - (size_t)written,
-                                    format, arguments);
+    int message_written = vsnprintf(entry, entry_size, format, arguments);
     va_end(arguments);
 
     if (message_written < 0) {
@@ -61,55 +72,44 @@ void log_event(const char *level, const char *format, ...) {
         return;
     }
 
-    size_t complete_entry_size = (size_t)written
-                               + (size_t)message_written;
-    entry[complete_entry_size++] = '\n';
-    entry[complete_entry_size] = '\0';
-
-    char temporary_name[] = LOG_FILE ".tmp.XXXXXX";
-    int temporary_fd = mkstemp(temporary_name);
-    if (temporary_fd < 0) {
+    sqlite3 *database = NULL;
+    if (sqlite3_open(LOG_DATABASE, &database) != SQLITE_OK) {
+        fprintf(stderr, "Could not open log database: %s\n",
+                database != NULL ? sqlite3_errmsg(database) : "unknown error");
+        if (database != NULL)
+            sqlite3_close(database);
         free(entry);
         return;
     }
 
-    FILE *temporary_file = fdopen(temporary_fd, "w");
-    if (temporary_file == NULL) {
-        close(temporary_fd);
-        unlink(temporary_name);
+    if (!initialize_database(database)) {
+        sqlite3_close(database);
         free(entry);
         return;
     }
 
-    FILE *old_file = fopen(LOG_FILE, "r");
-    int success = fputs(entry, temporary_file) != EOF;
+    sqlite3_stmt *statement = NULL;
+    const char *insert_log =
+        "INSERT INTO LOGS (TImeStamp, Source, LogInfo) "
+        "VALUES (?, ?, ?)";
+
+    int result = sqlite3_prepare_v2(database, insert_log, -1,
+                                    &statement, NULL);
+    if (result == SQLITE_OK) {
+        sqlite3_bind_text(statement, 1, time_text, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(statement, 2, level != NULL ? level : "",
+                          -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(statement, 3, entry, -1, SQLITE_TRANSIENT);
+        result = sqlite3_step(statement);
+    }
+
+    if (result != SQLITE_DONE)
+        fprintf(stderr, "Could not write log entry: %s\n",
+                sqlite3_errmsg(database));
+
+    sqlite3_finalize(statement);
+    sqlite3_close(database);
     free(entry);
-
-    if (old_file != NULL && success) {
-        char buffer[4096];
-        size_t bytes_read;
-
-        while ((bytes_read = fread(buffer, 1, sizeof(buffer), old_file)) > 0) {
-            if (fwrite(buffer, 1, bytes_read, temporary_file) != bytes_read) {
-                success = 0;
-                break;
-            }
-        }
-
-        if (ferror(old_file))
-            success = 0;
-    }
-
-    if (old_file != NULL)
-        fclose(old_file);
-
-    if (fclose(temporary_file) != 0)
-        success = 0;
-
-    if (success && rename(temporary_name, LOG_FILE) == 0)
-        return;
-
-    unlink(temporary_name);
 }
 
 void log_info(const char *message) {
