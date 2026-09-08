@@ -5,6 +5,7 @@ from PySide6.QtWidgets import QApplication
 
 from config import (
     LOG_DATABASE,
+    CRUD_UI_FILE,
     PROJECT_DIR,
     SERVERMEMORY_DIR,
     SERVER_EXECUTABLE,
@@ -76,6 +77,17 @@ def log_button_clicked():
 def memory_button_clicked():
     open_path(SERVERMEMORY_DIR)
 
+def crud_window_clicked():
+    global crud_window
+
+    if crud_window is None:
+        crud_window = QUiLoader().load(str(CRUD_UI_FILE), window)
+
+    if crud_window is not None:
+        crud_window.show()
+        crud_window.raise_()
+        crud_window.activateWindow()
+
 def disconnect_client_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
         server_process.write(b"kick\n")
@@ -126,6 +138,7 @@ def server_button_clicked():
 
 app = QApplication([])
 window = QUiLoader().load(str(UI_FILE))
+crud_window = None
 
 log_model = QStandardItemModel(window)
 log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
@@ -142,6 +155,7 @@ window.pushButton.clicked.connect(log_button_clicked)
 window.pushButton_2.clicked.connect(server_button_clicked)
 window.pushButton_3.clicked.connect(memory_button_clicked)
 window.pushButton_4.clicked.connect(disconnect_client_clicked)
+window.pushButton_5.clicked.connect(crud_window_clicked)
 command_input_filter = CommandInputFilter(window)
 window.textEdit.installEventFilter(command_input_filter)
 
