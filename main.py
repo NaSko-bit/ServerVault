@@ -17,7 +17,7 @@ from log_service import (
     fetch_recent_logs,
     find_connected_client,
 )
-from crud_service import fetch_table, list_tables
+from crud_service import fetch_table, list_tables, update_table
 from system_service import get_host_ip, open_path
 
 
@@ -79,16 +79,23 @@ def memory_button_clicked():
     open_path(SERVERMEMORY_DIR)
 
 def load_crud_table(table_name):
+    global crud_table_name, crud_columns, crud_original_rows
+
     crud_model.clear()
 
     try:
         columns, rows = fetch_table(table_name)
+        crud_table_name = table_name
+        crud_columns = columns
+        crud_original_rows = rows
         crud_model.setHorizontalHeaderLabels(columns)
         for row in rows:
-            crud_model.appendRow([
-                QStandardItem("" if value is None else str(value))
-                for value in row
-            ])
+            items = []
+            for value in row:
+                item = QStandardItem("" if value is None else str(value))
+                item.setData(value, Qt.ItemDataRole.UserRole)
+                items.append(item)
+            crud_model.appendRow(items)
         crud_table_view.resizeColumnsToContents()
         crud_window.statusBar().showMessage(
             f"Loaded {len(rows)} rows from {table_name}"
@@ -99,6 +106,36 @@ def load_crud_table(table_name):
             QStandardItem(f"Unable to load {table_name}: {error}")
         ])
         crud_window.statusBar().showMessage("Could not load table")
+
+
+def update_crud_table():
+    if crud_table_name is None:
+        crud_window.statusBar().showMessage("No table selected")
+        return
+
+    updated_rows = []
+    for row_index in range(crud_model.rowCount()):
+        row = []
+        for column_index in range(crud_model.columnCount()):
+            item = crud_model.item(row_index, column_index)
+            row.append(item.text())
+        updated_rows.append(tuple(row))
+
+    try:
+        updated_count = update_table(
+            crud_table_name,
+            crud_columns,
+            crud_original_rows,
+            updated_rows,
+        )
+        crud_window.statusBar().showMessage(
+            f"Updated {updated_count} row(s) in {crud_table_name}"
+        )
+        load_crud_table(crud_table_name)
+    except Exception as error:
+        crud_window.statusBar().showMessage(
+            f"Unable to update {crud_table_name}: {error}"
+        )
 
 
 def initialize_crud_window():
@@ -112,6 +149,7 @@ def initialize_crud_window():
     crud_table_view.verticalHeader().setVisible(False)
 
     crud_window.comboBox.currentTextChanged.connect(load_crud_table)
+    crud_window.pushButton.clicked.connect(update_crud_table)
     crud_window.comboBox.clear()
 
     try:
@@ -192,6 +230,9 @@ window = QUiLoader().load(str(UI_FILE))
 crud_window = None
 crud_model = None
 crud_table_view = None
+crud_table_name = None
+crud_columns = []
+crud_original_rows = []
 
 log_model = QStandardItemModel(window)
 log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
