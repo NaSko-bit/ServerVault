@@ -5,7 +5,8 @@ import socket
 import subprocess
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QEvent, QObject, QProcess, QTimer, Qt
-from PySide6.QtWidgets import QApplication, QLabel, QVBoxLayout
+from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import QApplication
 
 
 SERVERMEMORY_DIR = "./Server"
@@ -48,6 +49,7 @@ def set_client_info(client=None):
 
 
 def refresh_logs():
+    rows = []
     try:
         with sqlite3.connect(LOG_DATABASE) as database:
             database.execute(
@@ -59,16 +61,33 @@ def refresh_logs():
                 ")"
             )
             rows = database.execute(
-                "SELECT TImeStamp, Source, LogInfo "
+                "SELECT LogID, TImeStamp, Source, LogInfo "
                 "FROM LOGS ORDER BY LogID DESC LIMIT ?",
                 (LOG_LINES_TO_SHOW,),
             ).fetchall()
-        lines = [f"[{timestamp}] [{source}] {info}"
-                 for timestamp, source, info in rows]
+        log_model.clear()
+        log_model.setHorizontalHeaderLabels(
+            ["LogID", "TImeStamp", "Source", "LogInfo"]
+        )
+        for row in rows:
+            log_model.appendRow([
+                QStandardItem(str(value)) for value in row
+            ])
     except (OSError, sqlite3.Error) as error:
-        lines = [f"Unable to read ServerVaultDB: {error}"]
+        log_model.clear()
+        log_model.setHorizontalHeaderLabels(
+            ["LogID", "TImeStamp", "Source", "LogInfo"]
+        )
+        log_model.appendRow([
+            QStandardItem(""),
+            QStandardItem(""),
+            QStandardItem("ERROR"),
+            QStandardItem(f"Unable to read ServerVaultDB: {error}"),
+        ])
 
-    log_label.setText("\n".join(lines[:LOG_LINES_TO_SHOW]) or "No logs yet.")
+    table_view.resizeColumnsToContents()
+    lines = [f"[{timestamp}] [{source}] {info}"
+             for _log_id, timestamp, source, info in rows]
     refresh_client_info(lines)
 
 
@@ -164,18 +183,18 @@ def server_button_clicked():
 app = QApplication([])
 window = QUiLoader().load(str(UI_FILE))
 
+log_model = QStandardItemModel(window)
+log_model.setHorizontalHeaderLabels(
+    ["LogID", "TImeStamp", "Source", "LogInfo"]
+)
+table_view = window.tableView
+table_view.setModel(log_model)
+table_view.setAlternatingRowColors(True)
+table_view.setSortingEnabled(False)
+table_view.verticalHeader().setVisible(False)
+
 server_process = QProcess(window)
 server_process.finished.connect(server_process_finished)
-
-log_label = QLabel()
-log_label.setWordWrap(True)
-log_label.setTextInteractionFlags(
-    log_label.textInteractionFlags()
-)
-log_layout = QVBoxLayout(window.scrollAreaWidgetContents)
-log_layout.setContentsMargins(6, 6, 6, 6)
-log_layout.addWidget(log_label)
-window.scrollArea.setWidgetResizable(True)
 
 window.pushButton.clicked.connect(log_button_clicked)
 window.pushButton_2.clicked.connect(server_button_clicked)
@@ -183,9 +202,6 @@ window.pushButton_3.clicked.connect(memory_button_clicked)
 window.pushButton_4.clicked.connect(disconnect_client_clicked)
 command_input_filter = CommandInputFilter(window)
 window.textEdit.installEventFilter(command_input_filter)
-window.scrollArea.verticalScrollBar().setValue(
-    window.scrollArea.verticalScrollBar().maximum()
-)
 
 
 log_timer = QTimer(window)
