@@ -1,33 +1,22 @@
-from pathlib import Path
-import re
-import sqlite3
-import socket
-import subprocess
 from PySide6.QtUiTools import QUiLoader
 from PySide6.QtCore import QEvent, QObject, QProcess, QTimer, Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QApplication
 
-
-SERVERMEMORY_DIR = "./Server"
-PROJECT_DIR = Path(__file__).resolve().parent
-UI_FILE = PROJECT_DIR / "MainWindow.ui"
-SERVER_EXECUTABLE = PROJECT_DIR / "server"
-LOG_DATABASE = PROJECT_DIR.parent / "ServerVaultDB"
-LOG_LINES_TO_SHOW = 20
-SERVER_PORT = 2000
-CLIENT_LINE_PATTERN = re.compile(
-    r"ip=(?P<ip>\S+)\s+port=(?P<port>\d+)\s+device_type=(?P<device>.*)$"
+from config import (
+    LOG_DATABASE,
+    PROJECT_DIR,
+    SERVERMEMORY_DIR,
+    SERVER_EXECUTABLE,
+    SERVER_PORT,
+    UI_FILE,
 )
-
-
-def get_host_ip():
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as address_socket:
-            address_socket.connect(("8.8.8.8", 80))
-            return address_socket.getsockname()[0]
-    except OSError:
-        return "localhost"
+from log_service import (
+    LOG_COLUMNS,
+    fetch_recent_logs,
+    find_connected_client,
+)
+from system_service import get_host_ip, open_path
 
 
 def set_server_status(online):
@@ -51,33 +40,16 @@ def set_client_info(client=None):
 def refresh_logs():
     rows = []
     try:
-        with sqlite3.connect(LOG_DATABASE) as database:
-            database.execute(
-                "CREATE TABLE IF NOT EXISTS LOGS ("
-                "LogID INTEGER PRIMARY KEY AUTOINCREMENT, "
-                "TImeStamp TEXT NOT NULL, "
-                "Source TEXT NOT NULL, "
-                "LogInfo TEXT NOT NULL"
-                ")"
-            )
-            rows = database.execute(
-                "SELECT LogID, TImeStamp, Source, LogInfo "
-                "FROM LOGS ORDER BY LogID DESC LIMIT ?",
-                (LOG_LINES_TO_SHOW,),
-            ).fetchall()
+        rows = fetch_recent_logs()
         log_model.clear()
-        log_model.setHorizontalHeaderLabels(
-            ["LogID", "TImeStamp", "Source", "LogInfo"]
-        )
+        log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
         for row in rows:
             log_model.appendRow([
                 QStandardItem(str(value)) for value in row
             ])
-    except (OSError, sqlite3.Error) as error:
+    except Exception as error:
         log_model.clear()
-        log_model.setHorizontalHeaderLabels(
-            ["LogID", "TImeStamp", "Source", "LogInfo"]
-        )
+        log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
         log_model.appendRow([
             QStandardItem(""),
             QStandardItem(""),
@@ -86,37 +58,9 @@ def refresh_logs():
         ])
 
     table_view.resizeColumnsToContents()
-    lines = [f"[{timestamp}] [{source}] {info}"
-             for _log_id, timestamp, source, info in rows]
-    refresh_client_info(lines)
-
-
-def refresh_client_info(lines):
-    if server_process.state() != QProcess.ProcessState.Running:
-        set_client_info()
-        return
-
-    chronological_lines = list(reversed(lines))
-    server_start = -1
-    for index, line in enumerate(chronological_lines):
-        if "[SERVER] Server starting on port" in line:
-            server_start = index
-
-    client = None
-    for line in chronological_lines[server_start + 1:]:
-        if "[CLIENT] Client disconnected:" in line:
-            client = None
-            continue
-
-        if "[CLIENT] Client connected:" not in line and \
-                "[CLIENT] Client identity:" not in line:
-            continue
-
-        match = CLIENT_LINE_PATTERN.search(line)
-        if match:
-            client = match.groupdict()
-
-    set_client_info(client)
+    set_client_info(find_connected_client(
+        rows, server_process.state() == QProcess.ProcessState.Running
+    ))
 
 
 def server_process_finished(_exit_code, _exit_status):
@@ -127,10 +71,10 @@ def server_process_finished(_exit_code, _exit_status):
     refresh_logs()
 
 def log_button_clicked():
-    subprocess.Popen(["xdg-open", str(LOG_DATABASE)])
+    open_path(LOG_DATABASE)
 
 def memory_button_clicked():
-    subprocess.Popen(["xdg-open", str(SERVERMEMORY_DIR)])
+    open_path(SERVERMEMORY_DIR)
 
 def disconnect_client_clicked():
     if server_process.state() == QProcess.ProcessState.Running:
@@ -184,9 +128,7 @@ app = QApplication([])
 window = QUiLoader().load(str(UI_FILE))
 
 log_model = QStandardItemModel(window)
-log_model.setHorizontalHeaderLabels(
-    ["LogID", "TImeStamp", "Source", "LogInfo"]
-)
+log_model.setHorizontalHeaderLabels(LOG_COLUMNS)
 table_view = window.tableView
 table_view.setModel(log_model)
 table_view.setAlternatingRowColors(True)
